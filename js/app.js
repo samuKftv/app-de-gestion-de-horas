@@ -271,7 +271,6 @@ const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "o
 const MESES_L = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 const DIAS = ["L", "M", "X", "J", "V"];
 const DIAS_C = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"];
-const TIPOS = ["Grupo externo", "Guardia", "Tutoría", "Otro"];
 const dN = s => +s.slice(8, 10), mN = s => +s.slice(5, 7) - 1;
 const fCorta = s => dN(s) + " " + MESES[mN(s)];
 const fDia = s => DIAS_C[dow(s)] + " " + dN(s) + "/" + (mN(s) + 1);
@@ -955,7 +954,7 @@ function TablaModulos({ g, D, R, ed }) {
 }
 
 // ----- Profesorado: horario por docente -----
-const TIPOS_OC = ["Guardia", "Tutoría", "Reunión", "Grupo externo", "Coordinación", "Otra"];
+const TIPOS_OC = ["Guardia", "OC", "OL", "ATF", "Tutoría módulo"];
 const sinMinimo = p => p.minimo === "" || p.minimo == null;
 const abrevGrupo = nombre => (nombre || "").split(" · ")[0].split(" ").map(w => w.length > 4 && !/\d/.test(w) ? w.slice(0, 3) + "." : w).join(" ");
 const modPorId = (D, id) => { for (const g of D.grupos) { const m = (g.modulos || []).find(x => x.id === id); if (m) return { m, g }; } return null; };
@@ -1160,7 +1159,7 @@ function HorarioProf({ p, D, R, wHoy, semFoco }) {
     ${sel && html`<div class="hz-edit">
       <div class="fila centro"><b>${sel.tipo}</b><span class="muted">· ${(() => { const x = R.periodos.find(q => q.id === sel.per); return x ? DIAS_L[x.dia] + " " + x.ini + "–" + x.fin : ""; })()} · de S${semIdx(sel.desde) + 1} a S${semIdx(sel.hasta) + 1}</span><span class="espacio"></span><button class="btn mini" onClick=${() => setSelId(null)}>Cerrar</button></div>
       <div class="fila">
-        <label class="campo">Tipo<select id="ed-tipo" value=${sel.tipo} onChange=${e => cambiarSel({ tipo: e.target.value })}>${TIPOS_OC.map(t => html`<option value=${t}>${t}</option>`)}</select></label>
+        <label class="campo">Tipo<select id="ed-tipo" value=${sel.tipo} onChange=${e => cambiarSel({ tipo: e.target.value })}>${!TIPOS_OC.includes(sel.tipo) && html`<option value=${sel.tipo}>${sel.tipo} (tipo anterior)</option>`}${TIPOS_OC.map(t => html`<option value=${t}>${t}</option>`)}</select></label>
         <label class="campo" style="flex:1;min-width:160px">Detalle<input type="text" id="ed-texto" value=${sel.texto || ""} onInput=${e => cambiarSel({ texto: e.target.value })} /></label>
         <label class="campo">Desde<${SelectSemana} id="ed-desde" R=${R} value=${sel.desde} onChange=${v => cambiarSel(v > sel.hasta ? { desde: v, hasta: v } : { desde: v })} /></label>
         <label class="campo">Hasta<${SelectSemana} id="ed-hasta" R=${R} value=${sel.hasta} onChange=${v => cambiarSel(v < sel.desde ? { desde: v, hasta: v } : { hasta: v })} /></label>
