@@ -594,7 +594,7 @@ if (!P) {
 const { html, render, useState, useEffect, useMemo, useRef } = P;
 
 function useRuta() {
-  const leer = () => { const h = (location.hash || "").replace("#", ""); return ["plan", "avisos", "grupos", "profesorado", "calendario"].includes(h) ? h : "profesorado"; };
+  const leer = () => { const h = (location.hash || "").replace("#", ""); return ["plan", "avisos", "grupos", "profesorado", "calendario", "centro", "copias"].includes(h) ? h : "profesorado"; };
   const [r, setR] = useState(leer());
   useEffect(() => { const f = () => setR(leer()); window.addEventListener("hashchange", f); return () => window.removeEventListener("hashchange", f); }, []);
   return r;
@@ -645,12 +645,15 @@ function App() {
   else if (ruta === "grupos") vista = html`<${Grupos} ...${ctx} />`;
   else if (ruta === "plan") vista = html`<${Plan} ...${ctx} />`;
   else if (ruta === "calendario") vista = html`<${Calendario} ...${ctx} />`;
+  else if (ruta === "centro") vista = html`<${HorarioCentro} ...${ctx} />`;
+  else if (ruta === "copias") vista = html`<${Copia} ...${ctx} />`;
   else vista = html`<${Profesorado} ...${ctx} />`;
+  const esConfig = ["grupos", "calendario", "centro", "copias"].includes(ruta);
 
   const guardando = W.size > 0;
   if (S.modo === "login") return html`<${Acceso} />`;
   if (S.modo === "denegado") return html`<${SinPermiso} />`;
-  const est = S.modo === "cargando" ? ["guardando", "Conectando…"] : S.modo === "local" ? ["local", "Modo local: guardado solo en este navegador"] : S.error ? ["error", "Error al guardar"] : guardando ? ["guardando", "Guardando…"] : ["", "Cambios guardados"];
+  const est = S.modo === "cargando" ? ["guardando", "Conectando…"] : S.modo === "local" ? ["local", "Solo en este navegador"] : S.error ? ["error", "Error al guardar"] : guardando ? ["guardando", "Guardando…"] : ["", "Guardado"];
 
   return html`
     <header class="top"><div class="wrap">
@@ -659,14 +662,15 @@ function App() {
       <div class=${"estado-guardado " + est[0]} role="status"><span class="punto"></span>${est[1]}</div>
       ${S.usuario && html`<div class="cuenta-usr"><span title=${S.usuario.nombre}>${S.usuario.correo}</span><button class="btn mini" onClick=${salir}>Salir</button></div>`}
       <nav class="tabs" aria-label="Secciones">
-        ${[["profesorado", "Horario por docente"], ["plan", "Vista general"], ["avisos", "Avisos"], ["grupos", "Grupos y módulos"], ["calendario", "Calendario y horas"]].map(([k, t]) =>
-          html`<a href=${"#" + k} aria-current=${ruta === k ? "page" : undefined}>${t}${k === "avisos" && pendientesHoy > 0 ? html`<span class="cuenta" title="Profesores por debajo del mínimo en las próximas 4 semanas">${pendientesHoy}</span>` : ""}</a>`)}
+        ${[["profesorado", "Horarios"], ["plan", "Resumen"], ["avisos", "Avisos"], ["grupos", "Configuración"]].map(([k, t]) =>
+          html`<a href=${"#" + k} aria-current=${(k === "grupos" ? esConfig : ruta === k) ? "page" : undefined}>${t}${k === "avisos" && pendientesHoy > 0 ? html`<span class="cuenta" title="Profesores por debajo del mínimo en las próximas 4 semanas">${pendientesHoy}</span>` : ""}</a>`)}
       </nav>
     </div></header>
     <main class="wrap">
       ${S.error && html`<div class="aviso mal"><span>${S.error}</span><span class="espacio"></span><button class="btn mini" onClick=${() => { S.error = null; emitir(); }}>Cerrar</button></div>`}
       ${S.lento && html`<div class="aviso mal">Todavía no se puede conectar con tus datos. Lo que ves puede no estar actualizado.</div>`}
-      ${S.modo === "local" && html`<div class="aviso info">Modo local: los datos se guardan solo en este navegador. Para guardarlos en la nube y usarlos desde cualquier equipo, configura Firebase (instrucciones en el README del proyecto). Si ya lo configuraste, recarga la página con Ctrl+Mayús+R. Haz copias en Calendario y horas › Copia de seguridad.</div>`}
+      ${S.modo === "local" && html`<div class="aviso info">Estás en modo local: lo que hagas se guarda solo en este navegador. Si ya configuraste Firebase, recarga con Ctrl+Mayús+R.</div>`}
+      ${esConfig && html`<nav class="subnav" aria-label="Configuración">${[["grupos", "Grupos y módulos"], ["calendario", "Calendario"], ["centro", "Horario del centro"], ["copias", "Copias de seguridad"]].map(([k, t]) => html`<a href=${"#" + k} aria-current=${ruta === k ? "page" : undefined}>${t}</a>`)}</nav>`}
       ${vista}
     </main>
   `;
@@ -1083,48 +1087,49 @@ function TablaModulos({ g, D, R, ed }) {
 const TIPOS_OC = ["Guardia", "OC", "OL", "ATF", "Tutoría módulo"];
 const sinMinimo = p => p.minimo === "" || p.minimo == null;
 const abrevGrupo = nombre => (nombre || "").split(" · ")[0].split(" ").map(w => w.length > 4 && !/\d/.test(w) ? w.slice(0, 3) + "." : w).join(" ");
+const claseTipo = t => ({ "Guardia": "tp-guardia", "OC": "tp-oc", "OL": "tp-ol", "ATF": "tp-atf", "Tutoría módulo": "tp-tut", "Clases": "tp-clase" }[t] || "tp-otra");
 const modPorId = (D, id) => { for (const g of D.grupos) { const m = (g.modulos || []).find(x => x.id === id); if (m) return { m, g }; } return null; };
 
 function Profesorado({ D, R, wHoy, profSel, setProfSel, semFoco }) {
   const [nom, setNom] = useState("");
   const [min, setMin] = useState("");
+  const [nuevo, setNuevo] = useState(false);
   const sel = D.profesores.find(p => p.id === profSel) || D.profesores[0];
   const crear = e => {
     e.preventDefault();
     if (!nom.trim()) return;
     const id = nuevoId();
     setDoc("profesores", id, { nombre: nom.trim(), minimo: min === "" ? "" : +min, horario: [], creado: Date.now() }, 0);
-    setNom(""); setMin(""); setProfSel(id);
-  };
-  const estado = p => {
-    if (sinMinimo(p)) return ["festivo", "Sin mínimo"];
-    let k = 0; for (let w = wHoy; w < R.semanas.length; w++) if (estadoSemana(R, p, w).e === "falta") k++;
-    const ch = R.choques.filter(x => x.pid === p.id).length;
-    if (ch) return ["falta", ch + " choque(s)"];
-    return k ? ["falta", k + " sem. con faltas"] : ["ok", "Cubierto"];
+    setNom(""); setMin(""); setNuevo(false); setProfSel(id);
   };
   return html`<div class="pv">
     <aside class="pv-lista" aria-label="Docentes">
       <label class="campo pv-movil">Docente
         <select id="pv-sel" value=${sel ? sel.id : ""} onChange=${e => setProfSel(e.target.value)}>
-          ${D.profesores.map(p => html`<option value=${p.id}>${p.nombre}${sinMinimo(p) ? "" : " · " + fh(+p.minimo) + " h"}</option>`)}
+          ${D.profesores.map(p => html`<option value=${p.id}>${p.nombre}</option>`)}
         </select></label>
       <div class="pv-nav">
-        ${D.profesores.map(p => { const [cls, txt] = estado(p); return html`<button class=${"pv-item" + (sel && p.id === sel.id ? " on" : "")} onClick=${() => setProfSel(p.id)} aria-current=${sel && p.id === sel.id ? "true" : undefined}>
-          <span class="n">${p.nombre || "Sin nombre"}</span>
-          <span class="m num">${sinMinimo(p) ? "—" : fh(+p.minimo) + " h"}</span>
-          <span class=${"chip " + cls}>${txt}</span></button>`; })}
+        ${D.profesores.map(p => {
+          const st = estadoSemana(R, p, wHoy);
+          const ch = R.choques.some(x => x.pid === p.id);
+          const estado = ch ? "falta" : st.e;
+          const txt = ch ? "Tiene un choque" : sinMinimo(p) ? "Sin mínimo" : fh(st.total) + " de " + fh(st.min) + " h";
+          return html`<button class=${"pv-item" + (sel && p.id === sel.id ? " on" : "")} onClick=${() => setProfSel(p.id)} aria-current=${sel && p.id === sel.id ? "true" : undefined}>
+            <span class=${"dot " + estado} aria-hidden="true"></span>
+            <span class="n">${p.nombre || "Sin nombre"}</span>
+            <span class="m">${txt}</span></button>`;
+        })}
       </div>
-      <form class="pv-nuevo" onSubmit=${crear}>
-        <span class="eyebrow">Añadir docente</span>
-        <input type="text" id="np-nombre" value=${nom} onInput=${e => setNom(e.target.value)} placeholder="Nombre" aria-label="Nombre" />
-        <div class="fila centro" style="gap:6px;flex-wrap:nowrap"><input type="number" id="np-min" min="0" step="0.5" value=${min} onInput=${e => setMin(e.target.value)} placeholder="Mínimo h/sem" aria-label="Mínimo semanal" style="width:120px" />
-          <button class="btn" type="submit">Añadir</button></div>
-      </form>
+      ${nuevo ? html`<form class="pv-nuevo" onSubmit=${crear}>
+          <input type="text" id="np-nombre" value=${nom} onInput=${e => setNom(e.target.value)} placeholder="Nombre" aria-label="Nombre" />
+          <input type="number" id="np-min" min="0" step="0.5" value=${min} onInput=${e => setMin(e.target.value)} placeholder="Mínimo de horas por semana" aria-label="Mínimo semanal" />
+          <div class="fila centro" style="gap:6px"><button class="btn primario" type="submit">Añadir</button><button class="btn" type="button" onClick=${() => setNuevo(false)}>Cancelar</button></div>
+        </form>`
+        : html`<button class="btn pv-anadir" onClick=${() => setNuevo(true)}>+ Añadir docente</button>`}
     </aside>
     <section class="pv-main">
       ${sel && R.semanas.length ? html`<${HorarioProf} key=${sel.id} p=${sel} D=${D} R=${R} wHoy=${wHoy} semFoco=${semFoco} />`
-        : html`<div class="panel"><p class="muted">${D.profesores.length ? "Revisa las fechas del curso en Calendario y horas." : "Añade el primer docente con el formulario de la izquierda. Si tienes una copia con tus grupos y docentes, impórtala en Calendario y horas › Copia de seguridad."}</p></div>`}
+        : html`<div class="panel"><p class="muted">${D.profesores.length ? "Revisa las fechas del curso en Configuración › Calendario." : "Añade el primer docente, o importa tu copia en Configuración › Copias de seguridad."}</p></div>`}
     </section>
   </div>`;
 }
@@ -1135,9 +1140,10 @@ function HorarioProf({ p, D, R, wHoy, semFoco }) {
   const [w, setW] = useState(semFoco != null ? semFoco : wHoy);
   useEffect(() => { if (semFoco != null) setW(semFoco); }, [semFoco]);
   const [tipo, setTipo] = useState("Guardia");
-  const [texto, setTexto] = useState("");
+  const texto = "";
   const [hasta, setHasta] = useState(ult.lunes);
   const [selId, setSelId] = useState(null);
+  const [editando, setEditando] = useState(sinMinimo(p));
   const wi = Math.min(Math.max(w, 0), n - 1);
   const s = R.semanas[wi];
   const horario = p.horario || [];
@@ -1208,7 +1214,7 @@ function HorarioProf({ p, D, R, wHoy, semFoco }) {
       const conFija = lista.some(q => q.fija && per.ini < q.fin && q.ini < per.fin);
       const choque = man.length > 0 && (conClase.length > 0 || man.length > 1 || otraOc.length > 0);
       const bloqueado = !man.length && (conClase.length > 0 || otraOc.length > 0 || conFija);
-      const cls = "ag-b" + (per.recreo ? " recreo" : "") + (man.length ? " ocup" : "") + (choque ? " choque" : "") + (bloqueado ? " bloq" : "") + (fest ? " fest" : "") + (man.some(o => o.id === selId) ? " sel" : "");
+      const cls = "ag-b" + (per.recreo ? " recreo" : "") + (man.length ? " ocup " + claseTipo(man[0].tipo) : "") + (choque ? " choque" : "") + (bloqueado ? " bloq" : "") + (fest ? " fest" : "") + (man.some(o => o.id === selId) ? " sel" : "");
       const tip = [per.ini + "–" + per.fin + (per.recreo ? " · recreo" : "") + " · " + per.turno];
       for (const o of man) tip.push(o.tipo + (o.texto ? " · " + o.texto : "") + " · de S" + (semIdx(o.desde) + 1) + " a S" + (semIdx(o.hasta) + 1));
       for (const e of conClase) { const x = modPorId(D, e.modId); tip.push("Clase: " + (x ? x.m.nombre + " · " + x.g.nombre : "") + " " + e.ini + "–" + e.fin); }
@@ -1218,7 +1224,7 @@ function HorarioProf({ p, D, R, wHoy, semFoco }) {
       bloques.push(html`<button key=${per.id} class=${cls} style=${{ ...caja(per.ini, per.fin, carril(per)), zIndex: choque ? 4 : 1 }} disabled=${bloqueado} onClick=${onClick} title=${tip.join("\n")}
         aria-label=${DIAS_L[d] + " " + tip.join(", ") + (man.length ? "" : bloqueado ? "" : ". Pulsa para añadir " + tipo.toLowerCase())}>
         <span class="ag-t">${per.ini}</span>
-        ${man.length ? man.map(o => html`<span class="ag-oc"><b>${o.tipo}</b>${o.texto ? " " + o.texto : ""}</span>`) : per.recreo ? html`<span class="ag-rec">Recreo ${per.ini}</span>` : html`<span class="ag-mas" aria-hidden="true">+</span>`}
+        ${man.length ? man.map(o => html`<span class="ag-oc"><b>${o.tipo}</b>${o.texto ? " " + o.texto : ""}</span>`) : per.recreo ? html`<span class="ag-rec">Recreo</span>` : html`<span class="ag-mas" aria-hidden="true">+ ${tipo}</span>`}
       </button>`);
     }
     for (const e of clases) {
@@ -1238,37 +1244,42 @@ function HorarioProf({ p, D, R, wHoy, semFoco }) {
   const manual = items.filter(i => i.tipo === "manual");
   const resumen = [["Clases", clasesH], ...manual.map(i => [i.subtipo, i.horas])].filter(x => x[1] > 0);
 
+  const pct = st.min > 0 ? Math.min(100, Math.round(st.total / st.min * 100)) : 0;
+  const etiquetaEstado = { falta: "Faltan " + fh(-st.diff) + " h", exceso: "Sobran " + fh(st.diff) + " h", ok: "¡Cubierto!", vac: "Semana sin clase", parcial: "Semana incompleta", sinmin: "Pon su mínimo" }[st.e];
+
   return html`<div class="pc-cont">
-    <div class="pc-cab">
-      <label class="campo" style="flex:1;min-width:180px">Docente<input type="text" id=${"pn-" + p.id} value=${p.nombre} onInput=${e => editar("profesores", p.id, x => { x.nombre = e.target.value; })} /></label>
-      <label class="campo">Mínimo semanal (h)<input type="number" id=${"pm-" + p.id} min="0" step="0.5" value=${p.minimo} placeholder="Ej. 24" style="width:130px" onInput=${e => editar("profesores", p.id, x => { x.minimo = e.target.value === "" ? "" : +e.target.value; })} /></label>
-    </div>
-
-    <div class="hz-nav">
-      <button class="btn icono" disabled=${wi === 0} onClick=${() => { setW(wi - 1); setSelId(null); }} aria-label="Semana anterior">‹</button>
-      <${SelectSemana} id="hz-sem" R=${R} value=${s.lunes} onChange=${v => { setW(semIdx(v)); setSelId(null); }} />
-      <button class="btn icono" disabled=${wi === n - 1} onClick=${() => { setW(wi + 1); setSelId(null); }} aria-label="Semana siguiente">›</button>
-      ${wi !== wHoy && html`<button class="btn mini" onClick=${() => { setW(wHoy); setSelId(null); }}>Esta semana</button>`}
-      <span class="hz-rango">${rango(s.lunes, s.viernes)}${wi === wHoy ? " · esta semana" : ""}</span>
-      <span class="espacio"></span>
-      <div class="hz-tot">
-        ${resumen.map(([t, h]) => html`<span class="muted small">${t} <b class="num">${fh(h)}</b></span>`)}
-        <span class="small">Total <b class="num">${fh(st.total)} h</b>${sinMinimo(p) ? "" : " de " + fh(st.min)}</span>
-        ${st.e === "falta" && html`<span class="chip falta">Faltan ${fh(-st.diff)} h</span>`}
-        ${st.e === "exceso" && html`<span class="chip exceso">Sobran ${fh(st.diff)} h</span>`}
-        ${st.e === "ok" && html`<span class="chip ok">Cubre el mínimo</span>`}
-        ${st.e === "vac" && html`<span class="chip festivo">Semana no lectiva</span>`}
-        ${st.e === "parcial" && html`<span class="chip festivo">Semana incompleta</span>`}
-        ${st.e === "sinmin" && html`<span class="chip festivo">Pon su mínimo</span>`}
+    <section class="doc-cab">
+      ${editando ? html`<div class="doc-edit">
+          <label class="campo" style="flex:1;min-width:180px">Nombre<input type="text" id=${"pn-" + p.id} value=${p.nombre} onInput=${e => editar("profesores", p.id, x => { x.nombre = e.target.value; })} /></label>
+          <label class="campo">Mínimo de horas por semana<input type="number" id=${"pm-" + p.id} min="0" step="0.5" value=${p.minimo} placeholder="Ej. 24" style="width:150px" onInput=${e => editar("profesores", p.id, x => { x.minimo = e.target.value === "" ? "" : +e.target.value; })} /></label>
+          <button class="btn primario" onClick=${() => setEditando(false)}>Listo</button>
+          <${Confirmar} etiqueta="Eliminar docente" pregunta="Sí, eliminar" onSi=${() => setDoc("profesores", p.id, null, 0)} />
+        </div>`
+      : html`<div class="doc-id">
+          <h2>${p.nombre || "Sin nombre"}</h2>
+          <span class="muted">${sinMinimo(p) ? "Sin mínimo" : "Mínimo " + fh(st.min) + " h por semana"}</span>
+          <button class="btn-txt" onClick=${() => setEditando(true)}>Editar</button>
+        </div>`}
+      <div class="doc-prog">
+        <div class="prog-txt"><span><b class="grande">${fh(st.total)}</b>${sinMinimo(p) ? " h" : " de " + fh(st.min) + " h"}</span><span class=${"chip " + (st.e === "sinmin" || st.e === "vac" || st.e === "parcial" ? "festivo" : st.e)}>${etiquetaEstado}</span></div>
+        ${!sinMinimo(p) && html`<div class="prog" role="progressbar" aria-valuemin="0" aria-valuemax=${st.min} aria-valuenow=${st.total}><span class=${"prog-fill " + st.e} style=${{ width: pct + "%" }}></span></div>`}
+        <div class="prog-des">${resumen.map(([t, h]) => html`<span><i class=${"pt " + claseTipo(t)}></i>${t} ${fh(h)} h</span>`)}</div>
       </div>
+    </section>
+
+    <div class="sem-nav">
+      <button class="btn icono" disabled=${wi === 0} onClick=${() => { setW(wi - 1); setSelId(null); }} aria-label="Semana anterior">‹</button>
+      <div class="sem-act"><b>Semana ${wi + 1}</b><span>${rango(s.lunes, s.viernes)}</span></div>
+      <button class="btn icono" disabled=${wi === n - 1} onClick=${() => { setW(wi + 1); setSelId(null); }} aria-label="Semana siguiente">›</button>
+      ${wi !== wHoy ? html`<button class="btn mini" onClick=${() => { setW(wHoy); setSelId(null); }}>Ir a hoy</button>` : html`<span class="chip inicio">Esta semana</span>`}
     </div>
 
-    <div class="hz-pincel">
-      <span>Al pulsar una hora libre se añade</span>
-      <select id="hz-tipo" value=${tipo} onChange=${e => setTipo(e.target.value)} aria-label="Tipo de ocupación">${TIPOS_OC.map(t => html`<option value=${t}>${t}</option>`)}</select>
-      <input type="text" id="hz-texto" value=${texto} onInput=${e => setTexto(e.target.value)} placeholder="Detalle (opcional)" aria-label="Detalle" style="width:170px" />
-      <span>desde esta semana hasta</span>
-      <${SelectSemana} id="hz-hasta" R=${R} value=${hasta} onChange=${setHasta} />
+    <div class="pinceles">
+      <span class="muted">Pulsa una hora libre para añadir</span>
+      <div class="pills" role="radiogroup" aria-label="Qué añadir">
+        ${TIPOS_OC.map(t => html`<button class=${"pill " + claseTipo(t) + (t === tipo ? " on" : "")} role="radio" aria-checked=${t === tipo} onClick=${() => setTipo(t)}>${t}</button>`)}
+      </div>
+      <label class="hasta">hasta <${SelectSemana} id="hz-hasta" R=${R} value=${hasta} onChange=${setHasta} /></label>
     </div>
 
     <div class="ag-wrap" ref=${refAgenda}>
@@ -1280,10 +1291,10 @@ function HorarioProf({ p, D, R, wHoy, semFoco }) {
         </div>
       </div>
     </div>
-    <div class="leyenda"><span><i style="background:var(--accent-soft)"></i>Clase (sale sola)</span><span><i style="background:var(--bar);box-shadow:inset 0 0 0 1px var(--muted)"></i>Guardia u otra ocupación</span><span><i style="background:var(--low-bg);box-shadow:inset 0 0 0 1px var(--low-ink)"></i>Choque</span><span><i style="border:1px dashed var(--line)"></i>Hora libre: pulsa para añadir</span></div>
+    <div class="leyenda"><span><i class="pt tp-clase"></i>Sus clases (salen solas)</span><span><i class="pt" style="background:var(--low-bg);box-shadow:inset 0 0 0 1.5px var(--low-ink)"></i>Choque</span><span><i class="pt" style="border:1px dashed var(--muted)"></i>Hora libre</span></div>
 
     ${sel && html`<div class="hz-edit">
-      <div class="fila centro"><b>${sel.tipo}</b><span class="muted">· ${(() => { const x = R.periodos.find(q => q.id === sel.per); return x ? DIAS_L[x.dia] + " " + x.ini + "–" + x.fin : ""; })()} · de S${semIdx(sel.desde) + 1} a S${semIdx(sel.hasta) + 1}</span><span class="espacio"></span><button class="btn mini" onClick=${() => setSelId(null)}>Cerrar</button></div>
+      <div class="fila centro"><span class=${"pill on " + claseTipo(sel.tipo)}>${sel.tipo}</span><span class="muted"> ${(() => { const x = R.periodos.find(q => q.id === sel.per); return x ? DIAS_L[x.dia] + " " + x.ini + "–" + x.fin : ""; })()} · de S${semIdx(sel.desde) + 1} a S${semIdx(sel.hasta) + 1}</span><span class="espacio"></span><button class="btn mini" onClick=${() => setSelId(null)}>Cerrar</button></div>
       <div class="fila">
         <label class="campo">Tipo<select id="ed-tipo" value=${sel.tipo} onChange=${e => cambiarSel({ tipo: e.target.value })}>${!TIPOS_OC.includes(sel.tipo) && html`<option value=${sel.tipo}>${sel.tipo} (tipo anterior)</option>`}${TIPOS_OC.map(t => html`<option value=${t}>${t}</option>`)}</select></label>
         <label class="campo" style="flex:1;min-width:160px">Detalle<input type="text" id="ed-texto" value=${sel.texto || ""} onInput=${e => cambiarSel({ texto: e.target.value })} /></label>
@@ -1291,8 +1302,8 @@ function HorarioProf({ p, D, R, wHoy, semFoco }) {
         <label class="campo">Hasta<${SelectSemana} id="ed-hasta" R=${R} value=${sel.hasta} onChange=${v => cambiarSel(v < sel.desde ? { desde: v, hasta: v } : { hasta: v })} /></label>
       </div>
       <div class="fila centro">
-        <button class="btn" onClick=${quitarDesde}>Quitar desde esta semana (S${wi + 1})</button>
-        <${Confirmar} etiqueta="Quitar en todas las semanas" pregunta="Sí, quitar" onSi=${quitarTodo} />
+        <button class="btn" onClick=${quitarDesde}>Quitar desde esta semana</button>
+        <${Confirmar} etiqueta="Quitar todas las semanas" pregunta="Sí, quitar" onSi=${quitarTodo} />
       </div>
     </div>`}
 
@@ -1301,12 +1312,10 @@ function HorarioProf({ p, D, R, wHoy, semFoco }) {
       ${choques.map(x => { const m = x.modId ? modPorId(D, x.modId) : null; const k = R.idx(x.fecha); return html`<div>${x.tipo} del ${DIAS_L[x.dia].toLowerCase()} ${x.perTxt} coincide con ${m ? m.m.nombre + " (" + abrevGrupo(m.g.nombre) + ")" : x.otro ? "otra ocupación (" + x.otro + ")" : "otra ocupación"} desde la S${k + 1}${x.n > 1 ? " (" + x.n + " semanas)" : ""}. <button class="btn mini" onClick=${() => { setW(k); setSelId(x.ocId); }}>Ver</button></div>`; })}
     </div>`}
 
+    <h3 class="tira-tit">Horas por semana</h3>
     <div class="hz-tira" aria-label="Horas por semana">
       ${R.semanas.map((x, j) => { const e = estadoSemana(R, p, j); return html`<button key=${j} class=${"tz " + e.e + (j === wi ? " on" : "")} onClick=${() => { setW(j); setSelId(null); }} title=${"S" + (j + 1) + " · " + rango(x.lunes, x.viernes) + ": " + fh(e.total) + " h"}><b>S${j + 1}</b><span class="num">${fh(e.total)}</span></button>`; })}
     </div>
-    <p class="muted small">Las clases salen solas de los horarios de los grupos y cambian cuando rota el módulo. Pulsa una hora libre para añadir la ocupación elegida arriba; pulsa una ocupación para cambiarla o quitarla. Si una guardia queda encima de una clase nueva, se marca en rojo.</p>
-
-    <div class="fila centro"><span class="espacio"></span><${Confirmar} etiqueta="Eliminar docente" pregunta="Sí, eliminar docente" onSi=${() => setDoc("profesores", p.id, null, 0)} /></div>
   </div>`;
 }
 
@@ -1404,7 +1413,7 @@ function Calendario({ D, R }) {
     while ((y < yF || (y === yF && m <= mF)) && meses.length < 24) { meses.push({ y, m }); m++; if (m > 11) { m = 0; y++; } }
   }
   return html`
-    <div class="panel-cab"><h2>Calendario y horas del centro</h2></div>
+    <div class="panel-cab"><h2>Calendario del curso</h2></div>
     <div class="panel">
       <h3>Fechas del curso</h3>
       <div class="fila">
@@ -1448,8 +1457,7 @@ function Calendario({ D, R }) {
         })}
       </div>
     </div>
-    <${HorarioCentro} D=${D} />
-    <${Copia} D=${D} />
+
   `;
 }
 
