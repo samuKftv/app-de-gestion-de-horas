@@ -30,7 +30,70 @@ const generarSesiones = (dia, ini, fin, dur, recreos, turno) => {
   }
   return out.map(x => ({ id: "d" + dia + "-" + x.ini.replace(":", ""), ...x }));
 };
-const PERIODOS_DEF = [0, 1, 2, 3, 4].flatMap(d => generarSesiones(d, "18:10", "22:45", 55, [], "noche"));
+// Horario del centro (CIFP, curso 2026-27): sesiones, recreos y sesiones fijas para todo el profesorado.
+// Es el horario con el que arranca la app; se puede cambiar en Calendario y horas › Horario del centro.
+const PERIODOS_CENTRO = [
+  {"id": "d0-1400", "dia": 0, "ini": "14:00", "fin": "14:55", "horas": 1, "turno": "tarde"},
+  {"id": "d0-1455", "dia": 0, "ini": "14:55", "fin": "15:50", "horas": 1, "turno": "tarde"},
+  {"id": "d0-1550", "dia": 0, "ini": "15:50", "fin": "16:45", "horas": 1, "turno": "tarde"},
+  {"id": "d0-1645", "dia": 0, "ini": "16:45", "fin": "17:15", "recreo": true, "turno": "tarde"},
+  {"id": "d0-1715", "dia": 0, "ini": "17:15", "fin": "18:10", "horas": 1, "turno": "tarde"},
+  {"id": "d0-1810", "dia": 0, "ini": "18:10", "fin": "19:05", "horas": 1, "turno": "tarde"},
+  {"id": "d0-1905", "dia": 0, "ini": "19:05", "fin": "20:00", "horas": 1, "turno": "tarde"},
+  {"id": "d0-2000", "dia": 0, "ini": "20:00", "fin": "20:55", "horas": 1, "turno": "noche"},
+  {"id": "d0-2055", "dia": 0, "ini": "20:55", "fin": "21:50", "horas": 1, "turno": "noche"},
+  {"id": "d0-2150", "dia": 0, "ini": "21:50", "fin": "22:45", "horas": 1, "turno": "noche"},
+  {"id": "d1-1400", "dia": 1, "ini": "14:00", "fin": "14:55", "horas": 1, "turno": "tarde"},
+  {"id": "d1-1455", "dia": 1, "ini": "14:55", "fin": "15:50", "horas": 1, "turno": "tarde"},
+  {"id": "d1-1550", "dia": 1, "ini": "15:50", "fin": "16:45", "horas": 1, "turno": "tarde"},
+  {"id": "d1-1645", "dia": 1, "ini": "16:45", "fin": "17:15", "recreo": true, "turno": "tarde"},
+  {"id": "d1-1715", "dia": 1, "ini": "17:15", "fin": "18:10", "horas": 1, "turno": "tarde"},
+  {"id": "d1-1810", "dia": 1, "ini": "18:10", "fin": "19:05", "horas": 1, "turno": "tarde"},
+  {"id": "d1-1905", "dia": 1, "ini": "19:05", "fin": "20:00", "horas": 1, "turno": "tarde"},
+  {"id": "d1-2000", "dia": 1, "ini": "20:00", "fin": "20:55", "horas": 1, "turno": "noche"},
+  {"id": "d1-2055", "dia": 1, "ini": "20:55", "fin": "21:50", "horas": 1, "turno": "noche"},
+  {"id": "d1-2150", "dia": 1, "ini": "21:50", "fin": "22:45", "horas": 1, "turno": "noche"},
+  {"id": "d2-1400", "dia": 2, "ini": "14:00", "fin": "15:00", "horas": 1, "turno": "tarde", "fija": "RD"},
+  {"id": "d2-1500", "dia": 2, "ini": "15:00", "fin": "15:50", "horas": 1, "turno": "tarde"},
+  {"id": "d2-1550", "dia": 2, "ini": "15:50", "fin": "16:40", "horas": 1, "turno": "tarde"},
+  {"id": "d2-1640", "dia": 2, "ini": "16:40", "fin": "17:30", "horas": 1, "turno": "tarde"},
+  {"id": "d2-1730", "dia": 2, "ini": "17:30", "fin": "18:00", "recreo": true, "turno": "tarde"},
+  {"id": "d2-1800", "dia": 2, "ini": "18:00", "fin": "18:50", "horas": 1, "turno": "tarde"},
+  {"id": "d2-1810", "dia": 2, "ini": "18:10", "fin": "19:05", "horas": 1, "turno": "noche"},
+  {"id": "d2-1850", "dia": 2, "ini": "18:50", "fin": "19:40", "horas": 1, "turno": "tarde"},
+  {"id": "d2-1905", "dia": 2, "ini": "19:05", "fin": "20:00", "horas": 1, "turno": "noche"},
+  {"id": "d2-1940", "dia": 2, "ini": "19:40", "fin": "20:30", "horas": 1, "turno": "tarde"},
+  {"id": "d2-2000", "dia": 2, "ini": "20:00", "fin": "20:55", "horas": 1, "turno": "noche"},
+  {"id": "d2-2055", "dia": 2, "ini": "20:55", "fin": "21:50", "horas": 1, "turno": "noche"},
+  {"id": "d2-2150", "dia": 2, "ini": "21:50", "fin": "22:45", "horas": 1, "turno": "noche"},
+  {"id": "d3-1500", "dia": 3, "ini": "15:00", "fin": "15:55", "horas": 1, "turno": "tarde"},
+  {"id": "d3-1555", "dia": 3, "ini": "15:55", "fin": "16:50", "horas": 1, "turno": "tarde"},
+  {"id": "d3-1650", "dia": 3, "ini": "16:50", "fin": "17:45", "horas": 1, "turno": "tarde"},
+  {"id": "d3-1745", "dia": 3, "ini": "17:45", "fin": "18:15", "recreo": true, "turno": "tarde"},
+  {"id": "d3-1810", "dia": 3, "ini": "18:10", "fin": "19:05", "horas": 1, "turno": "noche"},
+  {"id": "d3-1815", "dia": 3, "ini": "18:15", "fin": "19:10", "horas": 1, "turno": "tarde"},
+  {"id": "d3-1905", "dia": 3, "ini": "19:05", "fin": "20:00", "horas": 1, "turno": "noche"},
+  {"id": "d3-1910", "dia": 3, "ini": "19:10", "fin": "20:05", "horas": 1, "turno": "tarde"},
+  {"id": "d3-2000", "dia": 3, "ini": "20:00", "fin": "20:55", "horas": 1, "turno": "noche"},
+  {"id": "d3-2005", "dia": 3, "ini": "20:05", "fin": "21:00", "horas": 1, "turno": "tarde"},
+  {"id": "d3-2055", "dia": 3, "ini": "20:55", "fin": "21:50", "horas": 1, "turno": "noche"},
+  {"id": "d3-2150", "dia": 3, "ini": "21:50", "fin": "22:45", "horas": 1, "turno": "noche"},
+  {"id": "d4-0800", "dia": 4, "ini": "08:00", "fin": "08:55", "horas": 1, "turno": "manana"},
+  {"id": "d4-0855", "dia": 4, "ini": "08:55", "fin": "09:50", "horas": 1, "turno": "manana"},
+  {"id": "d4-0950", "dia": 4, "ini": "09:50", "fin": "10:45", "horas": 1, "turno": "manana"},
+  {"id": "d4-1045", "dia": 4, "ini": "10:45", "fin": "11:15", "recreo": true, "turno": "manana"},
+  {"id": "d4-1115", "dia": 4, "ini": "11:15", "fin": "12:10", "horas": 1, "turno": "manana"},
+  {"id": "d4-1210", "dia": 4, "ini": "12:10", "fin": "13:05", "horas": 1, "turno": "manana"},
+  {"id": "d4-1305", "dia": 4, "ini": "13:05", "fin": "14:00", "horas": 1, "turno": "manana"},
+  {"id": "d4-1400", "dia": 4, "ini": "14:00", "fin": "14:55", "horas": 1, "turno": "tarde"},
+  {"id": "d4-1455", "dia": 4, "ini": "14:55", "fin": "15:50", "horas": 1, "turno": "tarde"},
+  {"id": "d4-1550", "dia": 4, "ini": "15:50", "fin": "16:45", "horas": 1, "turno": "tarde"},
+  {"id": "d4-1645", "dia": 4, "ini": "16:45", "fin": "17:15", "recreo": true, "turno": "tarde"},
+  {"id": "d4-1715", "dia": 4, "ini": "17:15", "fin": "18:10", "horas": 1, "turno": "tarde"},
+  {"id": "d4-1810", "dia": 4, "ini": "18:10", "fin": "19:05", "horas": 1, "turno": "tarde"},
+  {"id": "d4-1905", "dia": 4, "ini": "19:05", "fin": "20:00", "horas": 1, "turno": "tarde"}
+];
+const PERIODOS_DEF = PERIODOS_CENTRO;
 const periodosCurso = curso => {
   const base = (curso && curso.periodos && curso.periodos.length) ? curso.periodos : PERIODOS_DEF;
   const out = [];
@@ -283,11 +346,36 @@ const corto = nombre => { const p = (nombre || "").trim().split(/\s+/); return p
 const clon = o => JSON.parse(JSON.stringify(o));
 const docentesMod = (m, profesores) => [m.profesorId, m.profesorId2].filter((id, i, a) => id && a.indexOf(id) === i).map(id => profesores.find(p => p.id === id)).filter(Boolean);
 const porNombre = (a, b) => (a.nombre || "").localeCompare(b.nombre || "", "es", { numeric: true, sensitivity: "base" });
-const cursoPorDefecto = () => {
-  const h = hoyISO(), y = +h.slice(0, 4), m = mN(h);
-  const y0 = m >= 7 ? y : y - 1;
-  return { inicio: y0 + "-09-15", fin: (y0 + 1) + "-06-20", noLectivos: [] };
+// Calendario del centro con el que arranca la app (curso 2026-27)
+const CALENDARIO_CENTRO = {
+  inicio: "2026-09-17",
+  fin: "2027-06-11",
+  noLectivos: [
+    {"id": "nl1", "desde": "2026-10-12", "hasta": "2026-10-12", "motivo": "Fiesta Nacional"},
+    {"id": "nl2", "desde": "2026-11-02", "hasta": "2026-11-02", "motivo": "Festivo"},
+    {"id": "nl3", "desde": "2026-12-05", "hasta": "2026-12-08", "motivo": "Puente de diciembre"},
+    {"id": "nl4", "desde": "2026-12-23", "hasta": "2027-01-10", "motivo": "Navidad"},
+    {"id": "nl5", "desde": "2027-02-02", "hasta": "2027-02-02", "motivo": "Festivo"},
+    {"id": "nl6", "desde": "2027-02-22", "hasta": "2027-02-26", "motivo": "Carnaval"},
+    {"id": "nl7", "desde": "2027-03-20", "hasta": "2027-03-28", "motivo": "Semana Santa"},
+    {"id": "nl8", "desde": "2027-05-03", "hasta": "2027-05-03", "motivo": "Festivo"},
+    {"id": "nl9", "desde": "2027-05-31", "hasta": "2027-05-31", "motivo": "Festivo"}
+  ],
 };
+const cursoPorDefecto = () => ({ ...clon(CALENDARIO_CENTRO), periodos: clon(PERIODOS_CENTRO) });
+// Completa en la base de datos lo que falte del calendario y del horario del centro (una vez por sesión).
+let cursoRevisado = false;
+function completarCurso() {
+  if (cursoRevisado) return;
+  cursoRevisado = true;
+  const c = S.curso;
+  if (!c) { setCurso({}); return; }
+  const patch = {};
+  if (!Array.isArray(c.periodos) || !c.periodos.length) patch.periodos = clon(PERIODOS_CENTRO);
+  const generico = !c.inicio || !c.fin || (/-09-15$/.test(c.inicio) && /-06-20$/.test(c.fin) && !(c.noLectivos || []).length);
+  if (generico) Object.assign(patch, clon(CALENDARIO_CENTRO));
+  if (Object.keys(patch).length) setCurso(patch);
+}
 
 // ===== Almacén (db) =====
 const S = { curso: null, grupos: {}, profesores: {}, asignaciones: {}, listo: { curso: false, grupos: false, profesores: false, asignaciones: false }, modo: "cargando", error: null, lento: false, ver: 0 };
@@ -410,6 +498,7 @@ function suscribir() {
     if (!sucio("config/curso")) S.curso = snap.exists ? snap.data() : null;
     S.listo.curso = true; if (!snap.metadata.fromCache) { S.lento = false; clearTimeout(t); }
     emitir();
+    if (!snap.metadata.fromCache) completarCurso();
   }, errorSuscripcion);
   db.collection("grupos").onSnapshot(aplicarColeccion("grupos"), errorSuscripcion);
   db.collection("profesores").onSnapshot(aplicarColeccion("profesores"), errorSuscripcion);
@@ -1001,7 +1090,7 @@ function Profesorado({ D, R, wHoy, profSel, setProfSel, semFoco }) {
     </aside>
     <section class="pv-main">
       ${sel && R.semanas.length ? html`<${HorarioProf} key=${sel.id} p=${sel} D=${D} R=${R} wHoy=${wHoy} semFoco=${semFoco} />`
-        : html`<div class="panel"><p class="muted">${D.profesores.length ? "Revisa las fechas del curso en Calendario y horas." : "Añade el primer docente con el formulario de la izquierda."}</p></div>`}
+        : html`<div class="panel"><p class="muted">${D.profesores.length ? "Revisa las fechas del curso en Calendario y horas." : "Añade el primer docente con el formulario de la izquierda. Si tienes una copia con tus grupos y docentes, impórtala en Calendario y horas › Copia de seguridad."}</p></div>`}
     </section>
   </div>`;
 }
