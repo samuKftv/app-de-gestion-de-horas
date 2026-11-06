@@ -1,6 +1,7 @@
 // Service worker: guarda la app para abrirla sin conexión.
-// Primero intenta la red (para recibir siempre la última versión) y, si no hay conexión, usa la copia guardada.
-const CACHE = "cuadrante-docente-v2";
+// Primero pregunta al servidor si hay versión nueva (sin fiarse de la caché del navegador)
+// y, si no hay conexión, usa la copia guardada.
+const CACHE = "cuadrante-docente-v3";
 const BASICOS = ["./", "index.html", "css/estilos.css", "js/app.js", "js/firebase-config.js",
   "js/vendor/htm-preact-standalone.umd.js", "js/vendor/firebase-app-compat.js", "js/vendor/firebase-auth-compat.js",
   "js/vendor/firebase-firestore-compat.js", "manifest.webmanifest", "icons/icono.svg"];
@@ -15,9 +16,9 @@ self.addEventListener("fetch", e => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== location.origin) return;
   e.respondWith(
-    fetch(e.request).then(r => {
+    fetch(e.request, { cache: "no-cache" }).then(r => {
       if (r.ok) { const copia = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copia)); }
       return r;
-    }).catch(() => caches.match(e.request).then(r => r || caches.match("index.html")))
+    }).catch(() => caches.match(e.request, { ignoreSearch: true }).then(r => r || caches.match("index.html")))
   );
 });

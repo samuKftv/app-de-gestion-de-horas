@@ -541,7 +541,7 @@ function App() {
     <main class="wrap">
       ${S.error && html`<div class="aviso mal"><span>${S.error}</span><span class="espacio"></span><button class="btn mini" onClick=${() => { S.error = null; emitir(); }}>Cerrar</button></div>`}
       ${S.lento && html`<div class="aviso mal">Todavía no se puede conectar con tus datos. Lo que ves puede no estar actualizado.</div>`}
-      ${S.modo === "local" && html`<div class="aviso info">Modo local: los datos se guardan solo en este navegador. Para guardarlos en la nube y usarlos desde cualquier equipo, configura Firebase (instrucciones en el README del proyecto). Haz copias en Calendario y horas › Copia de seguridad.</div>`}
+      ${S.modo === "local" && html`<div class="aviso info">Modo local: los datos se guardan solo en este navegador. Para guardarlos en la nube y usarlos desde cualquier equipo, configura Firebase (instrucciones en el README del proyecto). Si ya lo configuraste, recarga la página con Ctrl+Mayús+R. Haz copias en Calendario y horas › Copia de seguridad.</div>`}
       ${vista}
     </main>
   `;
