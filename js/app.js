@@ -365,13 +365,46 @@ const CALENDARIO_CENTRO = {
 const cursoPorDefecto = () => ({ ...clon(CALENDARIO_CENTRO), periodos: clon(PERIODOS_CENTRO) });
 // Completa en la base de datos lo que falte del calendario y del horario del centro (una vez por sesión).
 let cursoRevisado = false;
+// Un horario guardado que no corresponde al del centro: vacío, en formato antiguo, sin recreos,
+// con noche el viernes o sin noche algún día de lunes a jueves.
+const horarioIncorrecto = ps => {
+  if (!Array.isArray(ps) || !ps.length) return true;
+  if (ps.some(x => x.dia == null)) return true;
+  if (!ps.some(x => x.recreo)) return true;
+  if (ps.some(x => +x.dia === 4 && x.turno === "noche")) return true;
+  return [0, 1, 2, 3].some(d => !ps.some(x => +x.dia === d && x.turno === "noche"));
+};
+// Pone el horario del centro y recoloca las ocupaciones ya puestas en la sesión del mismo día y hora.
+function restablecerHorarioCentro() {
+  const viejos = periodosCurso(curso());
+  const nuevos = periodosCurso({ periodos: PERIODOS_CENTRO });
+  const ids = new Set(nuevos.map(x => x.id));
+  const equivalente = id => {
+    if (ids.has(id)) return id;
+    const v = viejos.find(x => x.id === id);
+    const n = v && (nuevos.find(x => x.dia === v.dia && x.ini === v.ini) || nuevos.find(x => x.dia === v.dia && x.ini < v.fin && v.ini < x.fin && !x.fija));
+    return n ? n.id : null;
+  };
+  setCurso({ periodos: clon(PERIODOS_CENTRO) });
+  for (const [pid, p] of Object.entries(S.profesores)) {
+    const h = p.horario || [];
+    if (!h.length || h.every(o => ids.has(o.per))) continue;
+    editar("profesores", pid, x => {
+      x.horario = (x.horario || []).map(o => { const n = equivalente(o.per); return n ? { ...o, per: n, dia: nuevos.find(q => q.id === n).dia } : o; });
+    });
+  }
+}
+// Se revisa cuando el servidor ya ha dado el curso y el profesorado (para recolocar sus ocupaciones).
+const cargadoServidor = { curso: false, profesores: false };
 function completarCurso() {
-  if (cursoRevisado) return;
+  if (cursoRevisado || !cargadoServidor.curso || !cargadoServidor.profesores) return;
   cursoRevisado = true;
   const c = S.curso;
   if (!c) { setCurso({}); return; }
   const patch = {};
-  if (!Array.isArray(c.periodos) || !c.periodos.length) patch.periodos = clon(PERIODOS_CENTRO);
+  if (horarioIncorrecto(c.periodos)) {
+    restablecerHorarioCentro();
+  }
   const generico = !c.inicio || !c.fin || (/-09-15$/.test(c.inicio) && /-06-20$/.test(c.fin) && !(c.noLectivos || []).length);
   if (generico) Object.assign(patch, clon(CALENDARIO_CENTRO));
   if (Object.keys(patch).length) setCurso(patch);
@@ -484,6 +517,7 @@ function aplicarColeccion(nombre) {
       if (S[nombre][id]) next[id] = S[nombre][id]; else delete next[id];
     }
     S[nombre] = next; S.listo[nombre] = true;
+    if (nombre === "profesores" && !snap.metadata.fromCache) { cargadoServidor.profesores = true; setTimeout(completarCurso); }
     if (!snap.metadata.fromCache) S.lento = false;
     emitir();
   };
@@ -498,7 +532,7 @@ function suscribir() {
     if (!sucio("config/curso")) S.curso = snap.exists ? snap.data() : null;
     S.listo.curso = true; if (!snap.metadata.fromCache) { S.lento = false; clearTimeout(t); }
     emitir();
-    if (!snap.metadata.fromCache) completarCurso();
+    if (!snap.metadata.fromCache) { cargadoServidor.curso = true; completarCurso(); }
   }, errorSuscripcion);
   db.collection("grupos").onSnapshot(aplicarColeccion("grupos"), errorSuscripcion);
   db.collection("profesores").onSnapshot(aplicarColeccion("profesores"), errorSuscripcion);
@@ -1321,7 +1355,9 @@ function HorarioCentro({ D }) {
     </div>
     <div class="fila centro"><button class="btn mini" onClick=${anadir}>Añadir sesión</button>
       <span class="muted small">Copiar el ${DIAS_L[dia].toLowerCase()} a:</span>
-      ${DIAS_L.map((t, d) => d !== dia && html`<${Confirmar} mini etiqueta=${t} pregunta=${"Sustituir " + t.toLowerCase()} onSi=${() => copiarA(d)} />`)}</div>
+      ${DIAS_L.map((t, d) => d !== dia && html`<${Confirmar} mini etiqueta=${t} pregunta=${"Sustituir " + t.toLowerCase()} onSi=${() => copiarA(d)} />`)}
+      <span class="espacio"></span>
+      <${Confirmar} mini etiqueta="Restablecer horario del centro" pregunta="Sí, restablecer" onSi=${() => { restablecerHorarioCentro(); setMsg("Horario del centro restablecido: tarde de lunes a viernes (mañana el viernes), noche de lunes a jueves, recreos y RD del miércoles."); }} /></div>
     <form class="hc-gen" onSubmit=${generar}>
       <b>Generar sesiones para el ${DIAS_L[dia].toLowerCase()}</b>
       <label class="campo">Turno<select id="g-turno" value=${gTurno} onChange=${e => setGTurno(e.target.value)}>${TURNOS.map(([v, t]) => html`<option value=${v}>${t}</option>`)}</select></label>
