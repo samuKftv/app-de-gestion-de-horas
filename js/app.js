@@ -431,8 +431,10 @@ function almacenFirebase(fs, uid) {
   const base = "usuarios/" + uid + "/";
   const limpio = d => JSON.parse(JSON.stringify(d));
   return {
-    doc: p => { const r = fs.doc(base + p); return { onSnapshot: (n, e) => r.onSnapshot(n, e), set: d => r.set(limpio(d)), delete: () => r.delete() }; },
-    collection: p => { const r = fs.collection(base + p); return { onSnapshot: (n, e) => r.onSnapshot(n, e) }; },
+    // includeMetadataChanges: avisa también cuando el servidor confirma datos que ya estaban en la copia local;
+    // sin esto, la primera lectura confirmada (fromCache: false) podía no llegar nunca.
+    doc: p => { const r = fs.doc(base + p); return { onSnapshot: (n, e) => r.onSnapshot({ includeMetadataChanges: true }, n, e), set: d => r.set(limpio(d)), delete: () => r.delete() }; },
+    collection: p => { const r = fs.collection(base + p); return { onSnapshot: (n, e) => r.onSnapshot({ includeMetadataChanges: true }, n, e) }; },
   };
 }
 // Local (este navegador): para probar sin Firebase o trabajar sin cuenta
