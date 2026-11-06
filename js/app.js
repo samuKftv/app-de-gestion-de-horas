@@ -1335,6 +1335,23 @@ function Copia({ D }) {
     try { await downloads.save({ filename: "cuadrante-docente-copia.json", data: JSON.stringify(data, null, 2) }); setMsg("Copia descargada."); }
     catch (e) { setMsg(e && e.code === "declined" ? "Descarga cancelada." : "No se pudo descargar (" + (e && e.code || "error") + ")."); }
   };
+  const importarCalendario = e => {
+    const f = e.target.files && e.target.files[0]; e.target.value = "";
+    if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => {
+      try {
+        const d = JSON.parse(rd.result);
+        const c = d && d.curso;
+        if (!c || !c.inicio || !c.fin) throw new Error("formato");
+        const patch = { inicio: c.inicio, fin: c.fin, noLectivos: c.noLectivos || [] };
+        if (Array.isArray(c.periodos) && c.periodos.length) patch.periodos = c.periodos;
+        setCurso(patch);
+        setMsg("Calendario y horario del centro importados: " + (c.noLectivos || []).length + " periodos no lectivos y " + ((c.periodos || []).length) + " tramos horarios. Grupos, docentes y guardias no se han tocado.");
+      } catch (err) { setMsg("El archivo no es una copia válida de Cuadrante Docente."); }
+    };
+    rd.readAsText(f);
+  };
   const importar = e => {
     const f = e.target.files && e.target.files[0]; e.target.value = "";
     if (!f) return;
@@ -1360,11 +1377,13 @@ function Copia({ D }) {
     <div class="fila centro">
       ${downloads && html`<button class="btn" onClick=${exportar}>Descargar copia (JSON)</button>`}
       <label class="btn" for="importar">Importar copia…</label>
+      <label class="btn" for="importar-cal">Importar solo calendario y horario del centro…</label>
+      <input type="file" id="importar-cal" accept=".json,application/json" hidden onChange=${importarCalendario} />
       <input type="file" id="importar" accept=".json,application/json" hidden onChange=${importar} />
       <span class="espacio"></span>
       <${Confirmar} etiqueta="Borrar grupos, docentes y horas" pregunta="Sí, borrar todo" onSi=${borrarTodo} />
     </div>
-    <p class="muted small">Importar una copia sustituye todos los datos actuales.${msg ? " " : ""}<b>${msg}</b></p>
+    <p class="muted small">«Importar copia» sustituye todos los datos actuales. «Importar solo calendario y horario del centro» trae de la copia las fechas del curso, los festivos y las sesiones del centro, sin tocar lo demás.${msg ? " " : ""}<b>${msg}</b></p>
   </div>`;
 }
 
