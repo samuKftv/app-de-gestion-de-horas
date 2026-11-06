@@ -26,8 +26,9 @@ Los datos **nunca** se guardan en este repositorio: aquí solo está el código.
 3. **Dominio autorizado**: en *Authentication › Configuración › Dominios autorizados*, pulsa *Agregar dominio* y añade `samukftv.github.io`.
 4. **Base de datos**: *Compilación › Firestore Database › Crear base de datos*. Ubicación en Europa (por ejemplo `europe-southwest1`, Madrid) y **modo de producción**.
 5. **Reglas**: en la pestaña *Reglas* de Firestore, borra lo que haya, pega el contenido de [`firestore.rules`](firestore.rules) y pulsa *Publicar*.
-   - Opcional: para que solo tu cuenta pueda entrar, cambia la condición por
-     `request.auth != null && request.auth.uid == uid && request.auth.token.email == "TU_CORREO"`.
+   - Recomendado: para que solo tu cuenta pueda usar la app, cambia la condición **en la consola** (no en este repositorio, que es público) por
+     `request.auth != null && request.auth.uid == uid && request.auth.token.email in ["tu-correo@gmail.com"]`.
+     Cualquier otra cuenta verá el aviso «Sin acceso».
 6. **Datos de conexión**: en ⚙ *Configuración del proyecto › General › Tus apps*, pulsa el icono web `</>`, registra la app (sin Hosting) y copia el bloque `firebaseConfig`.
 7. Pega esos valores en [`js/firebase-config.js`](js/firebase-config.js), en lugar de `null`. Puedes editarlo desde la web de GitHub (icono del lápiz) y guardar con *Commit changes*. En un minuto la web se actualiza.
 

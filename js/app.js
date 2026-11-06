@@ -400,7 +400,9 @@ function aplicarColeccion(nombre) {
     emitir();
   };
 }
-function errorSuscripcion(e) { S.error = "No se pueden leer tus datos ahora mismo (" + (e && e.code || "error") + "). Recarga la página más tarde."; emitir(); }
+function errorSuscripcion(e) {
+  if (e && e.code === "permission-denied") { S.modo = "denegado"; emitir(); return; }
+  S.error = "No se pueden leer tus datos ahora mismo (" + (e && e.code || "error") + "). Recarga la página más tarde."; emitir(); }
 
 function suscribir() {
   const t = setTimeout(() => { if (!S.listo.grupos || !S.listo.curso) { S.lento = true; emitir(); } }, 10000);
@@ -524,6 +526,7 @@ function App() {
 
   const guardando = W.size > 0;
   if (S.modo === "login") return html`<${Acceso} />`;
+  if (S.modo === "denegado") return html`<${SinPermiso} />`;
   const est = S.modo === "cargando" ? ["guardando", "Conectando…"] : S.modo === "local" ? ["local", "Modo local: guardado solo en este navegador"] : S.error ? ["error", "Error al guardar"] : guardando ? ["guardando", "Guardando…"] : ["", "Cambios guardados"];
 
   return html`
@@ -1374,6 +1377,18 @@ function Acceso() {
       ${S.error && html`<div class="aviso mal">${S.error}</div>`}
       <button class="btn primario grande" onClick=${entrar}>Entrar con Google</button>
       <p class="muted small">Tus datos se guardan en tu proyecto de Firebase y solo los ve tu cuenta.</p>
+    </div>
+  </div>`;
+}
+
+function SinPermiso() {
+  return html`<div class="acceso">
+    <div class="acceso-caja">
+      <img src="icons/icono.svg" alt="" width="64" height="64" />
+      <h1>Sin acceso</h1>
+      <p>La cuenta <b>${S.usuario ? S.usuario.correo : ""}</b> no tiene permiso para usar este Cuadrante Docente.</p>
+      <p class="muted small">Si es tu app, sal y entra con la cuenta autorizada, o revisa las reglas de Firestore.</p>
+      <button class="btn primario grande" onClick=${salir}>Salir y cambiar de cuenta</button>
     </div>
   </div>`;
 }

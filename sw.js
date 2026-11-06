@@ -1,7 +1,7 @@
 // Service worker: guarda la app para abrirla sin conexión.
 // Primero pregunta al servidor si hay versión nueva (sin fiarse de la caché del navegador)
 // y, si no hay conexión, usa la copia guardada.
-const CACHE = "cuadrante-docente-v4";
+const CACHE = "cuadrante-docente-v5";
 const BASICOS = ["./", "index.html", "css/estilos.css", "js/app.js", "js/firebase-config.js",
   "js/vendor/htm-preact-standalone.umd.js", "js/vendor/firebase-app-compat.js", "js/vendor/firebase-auth-compat.js",
   "js/vendor/firebase-firestore-compat.js", "manifest.webmanifest", "icons/icono.svg"];
